@@ -204,7 +204,14 @@ def evaluate(users: pd.DataFrame, scores: pd.DataFrame) -> str:
     lines.append("")
     lv = m.groupby(["user_type", "alert_level"]).size().unstack(fill_value=0)
     lv["total"] = lv.sum(axis=1)
-    lines.append(lv.to_markdown())
+    for lvl in ["normal", "monitor", "needs_review", "high_risk"]:
+        if lvl not in lv.columns:
+            lv[lvl] = 0
+    lines.append("| tipe | normal | monitor | needs_review | high_risk | total |")
+    lines.append("|---|---|---|---|---|---|")
+    for utype, row in lv.iterrows():
+        lines.append(f"| {utype} | {row['normal']} | {row['monitor']} | "
+                     f"{row['needs_review']} | {row['high_risk']} | {row['total']} |")
     lines.append("")
     # precision@K: of the top-K scored users, how many are risky/mixed?
     topk = m.nlargest(2000, "final_user_risk")
