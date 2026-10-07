@@ -19,7 +19,9 @@ Ground truth = tipe user dari generator (evaluation only, pipeline tetap unlabel
   - Jarak: 92% transaksi >50 km, rata-rata 592 km (merchant di kota besar, payer di home city).
   - Nominal: hanya {25.000, 50.000, 100.000, 200.000} — berulang sama persis, tidak variasi.
   - Repetisi merchant: rata-rata hanya 3 merchant per user, dibayar puluhan kali.
-  - Kategori merchant: digital_service 54%, game_topup 35%, entertainment 11%.
+  - Kategori merchant: acak (retail, makanan, transportasi, ...) - kategori
+    tidak dijadikan sinyal karena merchant deposit judi nyata nyangkut di
+    kategori random, bukan kategori khusus.
   - Waktu: transaksi terkonsentrasi di paruh kedua window (spike perilaku, 6.7 C).
 - **remote** = uji false positive: jarak jauh (~50% transaksi lintas kota) tapi nominal
   variatif dan kategori normal. Sistem yang benar harus TIDAK menaruhnya di high_risk

@@ -69,14 +69,15 @@ MCC_MAP = {
     "7297": "family_transfer", "8299": "family_transfer",
 }
 
-# Category weights for NORMAL context merchants.
+# Category weights for ALL merchants, risky or not. In reality merchants pick
+# (or mis-pick) categories independent of whether they receive gambling
+# deposits - a deposit-fronting merchant shows up as a warung or retail shop.
+# Category is therefore never a risk signal in this system.
 CATEGORY_W = {
-    "food_beverage": 0.30, "retail_grocery": 0.22, "transportation": 0.12,
+    "food_beverage": 0.28, "retail_grocery": 0.22, "transportation": 0.12,
     "utilities": 0.08, "donation": 0.04, "ticket": 0.04,
-    "digital_service": 0.06, "entertainment": 0.06, "family_transfer": 0.08,
+    "digital_service": 0.08, "entertainment": 0.06, "family_transfer": 0.08,
 }
-# Risky merchants concentrate here.
-RISKY_CATEGORY_W = {"game_topup": 0.55, "digital_service": 0.35, "entertainment": 0.10}
 
 AMOUNT_BY_CATEGORY = {  # (low, typical_high) rupiah, log-uniform within range
     "food_beverage": (1000, 150000), "retail_grocery": (2000, 400000),
@@ -136,7 +137,7 @@ class MerchantRegistry:
         self.rows = []
 
     def create(self, risky=False):
-        w = RISKY_CATEGORY_W if risky else CATEGORY_W
+        w = CATEGORY_W
         cats = list(w)
         weights = [w[c] for c in cats]
         category = self.rng.choices(cats, weights=weights)[0]
