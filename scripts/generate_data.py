@@ -55,47 +55,44 @@ MIXED_RISKY_SHARE = 0.3
 # Merchant pool size per user type.
 POOL_SIZE = {"normal": 10, "heavy": 30, "remote": 14, "risky": 3, "mixed": 10}
 
-# MCC -> category mapping (subset; rest -> other). AGENTS.md 4.1.1.
+# MCC -> PJSP-style business category. The enum follows what real PJSPs use in
+# QRIS merchant onboarding (DANA Bisnis: kedai makanan/minuman, toko retail,
+# usaha jasa, usaha rumahan/online; Xendit/Midtrans use similar coarse sets).
+# We keep 4 coarse categories and map MCCs into them; unknown MCC -> other.
 MCC_MAP = {
     "5812": "food_beverage", "5814": "food_beverage", "5912": "food_beverage",
-    "5411": "retail_grocery", "5331": "retail_grocery", "5921": "retail_grocery",
-    "4111": "transportation", "4121": "transportation", "5541": "transportation",
-    "4900": "utilities",
-    "5732": "game_topup", "5734": "game_topup", "7994": "game_topup",
-    "8398": "donation", "8651": "donation",
-    "7922": "ticket", "7991": "ticket",
-    "7372": "digital_service", "4816": "digital_service",
-    "7941": "entertainment", "5816": "entertainment",
-    "7297": "family_transfer", "8299": "family_transfer",
+    "5411": "retail", "5331": "retail", "5921": "retail",
+    "4111": "services", "4121": "services", "5541": "services",
+    "4900": "services", "7922": "services", "7991": "services",
+    "7372": "services", "4816": "services", "7941": "services",
+    "5732": "services", "5734": "services", "7994": "services",
+    "8398": "services", "8651": "services",
+    "7297": "services", "8299": "services", "5816": "services",
 }
 
 # Category weights for ALL merchants, risky or not. In reality merchants pick
 # (or mis-pick) categories independent of whether they receive gambling
 # deposits - a deposit-fronting merchant shows up as a warung or retail shop.
 # Category is therefore never a risk signal in this system.
+# Weights are an assumption: only "food/retail dominate (93% MSMEs)" is
+# grounded (BI SI-2025 press release); exact shares are not published.
 CATEGORY_W = {
-    "food_beverage": 0.28, "retail_grocery": 0.22, "transportation": 0.12,
-    "utilities": 0.08, "donation": 0.04, "ticket": 0.04,
-    "digital_service": 0.08, "entertainment": 0.06, "family_transfer": 0.08,
+    "food_beverage": 0.40, "retail": 0.35, "services": 0.20, "other": 0.05,
 }
 
 AMOUNT_BY_CATEGORY = {  # (low, typical_high) rupiah, log-uniform within range
-    "food_beverage": (1000, 150000), "retail_grocery": (2000, 400000),
-    "transportation": (2000, 50000), "utilities": (10000, 500000),
-    "donation": (1000, 100000), "ticket": (25000, 500000),
-    "digital_service": (5000, 200000), "entertainment": (5000, 250000),
-    "family_transfer": (20000, 500000), "game_topup": (10000, 100000),
-    "other": (5000, 200000),
+    "food_beverage": (1000, 150000), "retail": (2000, 400000),
+    "services": (2000, 500000), "other": (5000, 200000),
 }
 
 # Round-amount behaviour (grounded in domain knowledge, not a fixed "risky set"):
 # gambling deposits overwhelmingly use round multiples of 50k (50k, 100k, 150k,
 # 200k, ...) and rarely odd values - but NOT exclusively:
-#  - normal users also pay round amounts (family transfers, utility bills)
+#  - normal users also pay round amounts (bills, services)
 #  - gambling users occasionally deposit odd amounts
 # The A signal must therefore be statistical (share of repeated large round
 # amounts), never "round amount = gambling".
-ROUND_TRANSFER_CATEGORIES = {"family_transfer", "utilities", "digital_service"}
+ROUND_TRANSFER_CATEGORIES = {"services"}
 ROUND_TRANSFER_SHARE = 0.40          # share of those categories paid in round 50k multiples
 RISKY_ROUND_SHARE = 0.85             # share of gambling deposits that are round
 RISKY_DEPOSIT_GRID = [50_000, 100_000, 150_000, 200_000, 250_000,

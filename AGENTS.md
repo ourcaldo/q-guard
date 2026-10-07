@@ -138,8 +138,9 @@ Keterangan:
 Kategori merchant (MCC):
 
 - Data mentah menyimpan `merchant_mcc` 4-digit sesuai tag 52 QR, karena itu field yang benar-benar ada di setiap transaksi QRIS. QRIS disusun BI di atas standar EMVCo Merchant-Presented Mode (PADG No. 21/16/PADG/2019); MCC didefinisikan ISO 18245 dan wajib ada di payload QRIS (contoh payload PJSP Indonesia: `5204 5812`).
-- Fitur model memakai `merchant_category` enum turunan (cardinality rendah) hasil mapping statis MCC ke enum, mis. 5812 food_beverage, 5411 retail_grocery, 5732 game_topup, 8398 donation, 7922 ticket, 7372 digital_service. MCC mentah terlalu granular/sparse untuk fitur langsung.
-- Mapping MCC ke enum adalah kode (konstanta generator), bukan data: subset ~20-30 MCC yang dipakai, sisanya ke `other`. Bisa diperluas tanpa regenerate data.
+- Fitur model memakai `merchant_category` enum turunan (cardinality rendah). Enum mengikuti set kategori yang dipakai PJSP nyata pada onboarding merchant QRIS (contoh DANA Bisnis: kedai makanan/minuman, toko retail, usaha jasa, usaha rumahan/online): `food_beverage`, `retail`, `services`, `other`. BI tidak mempublikasi distribusi kategori merchant; yang resmi hanya 93%+ merchant adalah UMKM (siaran pers BI No.27/170/DKom/2025).
+- Mapping MCC ke enum adalah kode (konstanta generator), bukan data. Bobot antar kategori adalah asumsi (hanya dominasi food/retail yang berdasar); daftar parameter asumsi ada di docs/ASSUMPTIONS.md.
+- Kategori merchant bukan sinyal risiko. User risky membayar merchant dengan sebaran kategori sama seperti user normal; merchant deposit judi nyata nyangkut di kategori acak.
 - NMID (National Merchant ID, format `ID2019002291555`), Terminal ID, nama merchant, dan nama acquirer tampil pada stiker QRIS resmi sesuai dokumen sosialisasi BI.
 
 ### 4.2 User
