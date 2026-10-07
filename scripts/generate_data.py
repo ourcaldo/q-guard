@@ -38,22 +38,36 @@ import pandas as pd
 
 SEED_DEFAULT = 42
 
+# User types. The "adversarial" types exist to keep the evaluation honest
+# (see docs/ASSUMPTIONS.md): without them the synthetic data is too easy and
+# every detector scores near-perfect, which proves nothing.
 USER_TYPE_SHARES = [
-    ("normal", 0.85),
+    ("normal", 0.79),
     ("heavy", 0.07),
     ("remote", 0.05),
     ("risky", 0.02),
     ("mixed", 0.01),
+    # adversarial types - hardening round 1
+    ("risky_noisy", 0.03),   # gambling pattern but messy: odd amounts, wider pool
+    ("normal_hard", 0.02),   # innocent but looks risky: round transfers, some remote
+    ("risky_silent", 0.01),  # only ONE dimention is off (e.g. repeated amounts only)
 ]
 
 # Mean transactions per user over the 6-month window, by type.
-TX_PER_USER = {"normal": 10, "heavy": 60, "remote": 14, "risky": 45, "mixed": 12}
+TX_PER_USER = {"normal": 10, "heavy": 60, "remote": 14, "risky": 45, "mixed": 12,
+               "risky_noisy": 45, "normal_hard": 20, "risky_silent": 25}
 
 # Share of a user's transactions that are "risky-pattern" for mixed users.
 MIXED_RISKY_SHARE = 0.3
 
 # Merchant pool size per user type.
-POOL_SIZE = {"normal": 10, "heavy": 30, "remote": 14, "risky": 3, "mixed": 10}
+POOL_SIZE = {"normal": 10, "heavy": 30, "remote": 14, "risky": 3, "mixed": 10,
+             "risky_noisy": 8, "normal_hard": 10, "risky_silent": 10}
+
+# Adversarial behaviour knobs.
+RISKY_NOISY_ROUND_SHARE = 0.45   # only some deposits are round amounts
+NORMAL_HARD_ROUND_SHARE = 0.50   # half of payments are round 50k multiples
+NORMAL_HARD_REMOTE_SHARE = 0.20  # some payments to a distant city (family)
 
 # MCC -> PJSP-style business category. The enum follows what real PJSPs use in
 # QRIS merchant onboarding (DANA Bisnis: kedai makanan/minuman, toko retail,
@@ -127,15 +141,21 @@ def jitter_coord(rng, lat, lon, km=JITTER_KM):
     return round(lat + dlat, 6), round(lon + dlon, 6)
 
 
-def amount_for(rng, category, risky=False):
+def amount_for(rng, category, risky=False, user_type="normal"):
     """Amounts: log-uniform per category, snapped to 100s (real merchant prices).
     Both sides get round amounts - normal users via transfer-like categories
     and utility bills, gambling users via the deposit grid. The overlap is the
     point: roundness alone never decides anything."""
     round_cat = category in ROUND_TRANSFER_CATEGORIES
-    if risky and rng.random() < RISKY_ROUND_SHARE:
-        return float(rng.choice(RISKY_DEPOSIT_GRID))
-    if (not risky) and round_cat and rng.random() < ROUND_TRANSFER_SHARE:
+    if risky:
+        share = {"risky_noisy": RISKY_NOISY_ROUND_SHARE,
+                 "risky_silent": RISKY_ROUND_SHARE}.get(user_type, RISKY_ROUND_SHARE)
+        if rng.random() < share:
+            return float(rng.choice(RISKY_DEPOSIT_GRID))
+    elif user_type == "normal_hard":
+        if rng.random() < NORMAL_HARD_ROUND_SHARE:
+            return float(rng.choice(RISKY_DEPOSIT_GRID))
+    elif round_cat and rng.random() < ROUND_TRANSFER_SHARE:
         return float(rng.choice(RISKY_DEPOSIT_GRID))
     lo, hi = AMOUNT_BY_CATEGORY.get(category, AMOUNT_BY_CATEGORY["other"])
     return float(round(10 ** rng.uniform(math.log10(lo), math.log10(hi)), -2))
@@ -260,9 +280,19 @@ def generate(n_users, n_tx, seed, out_dir):
         # Risky/mixed users pay a small merchant pool in one big remote city,
         # drawn from the SAME per-city registry everyone else uses.
         risky_pool = None
-        if u["user_type"] == "risky":
+        if u["user_type"] in ("risky", "risky_noisy"):
             rc = rng.choice(risky_cities)
-            risky_pool = registries[rc].sample(POOL_SIZE["risky"])
+            risky_pool = registries[rc].sample(POOL_SIZE[u["user_type"]])
+        elif u["user_type"] == "risky_silent":
+            # silent risky: LOCAL merchants (normal pool, no distance signal)
+            # with repeated round deposits - only the A/R signal is present
+            risky_pool = ureg[0].sample(POOL_SIZE["risky_silent"])
+        elif u["user_type"] == "normal_hard":
+            # hard normal: innocent user with a family/errand pattern in ONE
+            # distant city + round transfer-like amounts. Gets a remote pool
+            # like the remote type but fewer transactions there.
+            rc = rng.choice(risky_cities)
+            risky_pool = registries[rc].sample(6)
         elif u["user_type"] == "mixed":
             rc = rng.choice(risky_cities)
             risky_pool = registries[rc].sample(2)
@@ -293,10 +323,14 @@ def generate(n_users, n_tx, seed, out_dir):
         ts = pd.to_datetime(np.sort(ts))
 
         for k in range(n):
-            is_risky_tx = risky_pool is not None and (
-                u["user_type"] == "risky"
-                or (u["user_type"] == "mixed" and rng.random() < MIXED_RISKY_SHARE)
-            )
+            if u["user_type"] in ("risky", "risky_noisy", "risky_silent"):
+                is_risky_tx = True
+            elif u["user_type"] == "mixed":
+                is_risky_tx = rng.random() < MIXED_RISKY_SHARE
+            elif u["user_type"] == "normal_hard":
+                is_risky_tx = rng.random() < NORMAL_HARD_REMOTE_SHARE
+            else:
+                is_risky_tx = False
             if is_risky_tx:
                 m = risky_pool[rng.randrange(len(risky_pool))]
             else:
@@ -315,7 +349,8 @@ def generate(n_users, n_tx, seed, out_dir):
                                                 float(home["longitude"]))
             payer_city = home["name"]
 
-            amt = amount_for(rng, m["category"], risky=is_risky_tx)
+            amt = amount_for(rng, m["category"], risky=is_risky_tx,
+                             user_type=u["user_type"])
             amt = min(amt, MAX_AMOUNT)
             status = "success" if rng.random() > 0.04 else "failed"
 

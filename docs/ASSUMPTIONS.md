@@ -15,9 +15,17 @@ Kategori merchant (set PJSP)         food/retail/services/other (DANA Bisnis, Xe
 
 ## Asumsi (tidak ada sumber; nilai awal untuk pipeline test saja)
 
+Tipe adversarial (hardening round 1, agar evaluasi tidak terlalu mudah):
+
+| Tipe | Share | Desain |
+|---|---|---|
+| `risky_noisy` | 3% | pola deposit tapi berantakan: nominal gak selalu bulat (45%), pool merchant 8 |
+| `normal_hard` | 2% | innocent tapi mirip judol: transfer kelipatan 50k (50%), 18% tx ke kota jauh (keluarga) |
+| `risky_silent` | 1% | anomali SATU dimensi saja: nominal bulat berulang, merchant lokal (jarak netral) |
+
 | Parameter | Nilai awal | Catatan |
 |---|---|---|
-| `TX_PER_USER` | normal 10, heavy 60, remote 14, risky 45, mixed 12 per 6 bulan | agregat nasional ~30 tx/user/semester (BI) adalah batas bawah termasuk user dorman; baseline normal di generator masih jauh lebih rendah - perlu dinaikkan saat kalibrasi |
+| `TX_PER_USER` | normal 10, heavy 60, remote 14, risky 45, mixed 12, risky_noisy 45, normal_hard 20, risky_silent 25 per 6 bulan | agregat nasional ~30 tx/user/semester (BI) adalah batas bawah termasuk user dorman; baseline normal di generator masih jauh lebih rendah - perlu dinaikkan saat kalibrasi |
 | `CATEGORY_W` | food 40%, retail 35%, services 20%, other 5% | hanya dominasi food/retail yang berdasar (UMKM); persentase karangan |
 | `AMOUNT_BY_CATEGORY` | rentang log-uniform per kategori | dikalibrasi agar mean global ~Rp90rb cocok anchor BI; rentang per kategori karangan |
 | `POOL_SIZE` | normal 10, heavy 30, remote 14, risky 3, mixed 10 | "pool sempit untuk repetisi" ada di AGENTS.md; angka karangan |
