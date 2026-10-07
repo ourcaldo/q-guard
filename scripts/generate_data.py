@@ -256,11 +256,22 @@ def generate(n_users, n_tx, seed, out_dir):
             local_pool += ureg[1].sample(pool_size)
 
         n = int(n_tx_user[i])
-        # timestamps spread over the window; risky users cluster later (spike)
+        # Timestamps: all types get an even base spread over the window.
+        # Risky users additionally get one of three shapes, mirroring reality -
+        # not every gambling user starts slow:
+        #   "steady"  : dense deposits from the start (addict pattern)
+        #   "spike"   : normal first, surge later (new gambler)
+        #   "burst"   : short intense episode somewhere in the window
+        days = nprng.integers(0, WINDOW_DAYS, size=n)
         if u["user_type"] == "risky":
-            days = nprng.choice(np.arange(int(WINDOW_DAYS * 0.5), WINDOW_DAYS), size=n)
-        else:
-            days = nprng.integers(0, WINDOW_DAYS, size=n)
+            shape = rng.choice(["steady", "spike", "burst"])
+            if shape == "steady":
+                pass  # base uniform spread is already dense
+            elif shape == "spike":
+                days = nprng.choice(np.arange(int(WINDOW_DAYS * 0.5), WINDOW_DAYS), size=n)
+            else:  # burst: a random ~3-week intense episode
+                start = rng.randrange(0, WINDOW_DAYS - 21)
+                days = nprng.integers(start, start + 21, size=n)
         ts = pd.Timestamp("2026-04-01").value + days * 86400 * 10**9
         ts += nprng.integers(0, 86400, size=n) * 10**9  # random time of day (not a signal)
         ts = pd.to_datetime(np.sort(ts))
