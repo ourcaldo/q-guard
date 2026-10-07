@@ -34,6 +34,11 @@ FEATURES = [
     "round_large_ratio", "amount_cv", "repeat_amount_ratio",
     "tx_count", "distinct_merchants", "tx_per_merchant", "merchant_conc",
     "freq_change",
+    # interaction: repeated round amounts are the deposit core pattern.
+    # Distinguishes silent-local depositors from innocent bill payers whose
+    # round amounts repeat only a couple of times a month.
+    "repeat_round_ratio",
+    "max_amount_occurrences",
 ]
 
 

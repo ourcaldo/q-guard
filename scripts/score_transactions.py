@@ -30,7 +30,10 @@ OUT = os.path.join(BASE, "output")
 
 # --- scoring weights (AGENTS.md 7-8, M removed and renormalized) ------------
 W_TX = {"L": 0.30 / 0.80, "A": 0.25 / 0.80, "B": 0.25 / 0.80}
-W_PATTERN = {"F": 0.30, "R": 0.25, "L": 0.25, "C": 0.20}
+# Pattern weights, round 2: A (amount anomaly incl. repetition) enters the
+# pattern score directly - repeated round deposits are deposit-core evidence
+# even when location and merchant signals are absent (risky_silent case).
+W_PATTERN = {"F": 0.20, "R": 0.15, "L": 0.15, "C": 0.10, "A": 0.40}
 W_FINAL_USER = 0.60
 W_FINAL_PATTERN = 0.40
 
@@ -47,6 +50,7 @@ RECENT_WEIGHTS = {        # recency quartile -> weight for UserRisk (AGENTS.md 8
 # needs_review, 0 remote-FP inflation that matters, normal FP = 0.
 # ponytail: recalibrate when components change or real data arrives.
 ALERT_THRESHOLDS = {"monitor": 30.0, "needs_review": 45.0, "high_risk": 52.0}
+PATTERN_FLOOR = 48.0  # pattern score that alone justifies review (see score())
 
 
 def haversine_np(lat1, lon1, lat2, lon2):
@@ -91,6 +95,17 @@ def per_user_features(tx: pd.DataFrame) -> pd.DataFrame:
         vc = d.value_counts()
         return (vc[vc > 1].sum() / vc.sum()) if len(vc) else 0.0
     f["repeat_amount_ratio"] = tx.groupby("user_id").amount.apply(repeated_share)
+    # interaction features for stage 2: repeated ROUND amounts (deposit core)
+    def repeat_round(d):
+        round_d = d[d % ROUND_MULTIPLE == 0]
+        if len(round_d) == 0:
+            return 0.0
+        vc = round_d.value_counts()
+        return float(vc[vc > 1].sum() / vc.sum())
+    f["repeat_round_ratio"] = tx.groupby("user_id").amount.apply(repeat_round)
+    # single most-repeated amount count (catches grid-deposit even if varied)
+    f["max_amount_occurrences"] = tx.groupby("user_id").amount.apply(
+        lambda d: int(d.value_counts().max()) if len(d) else 0)
 
     # F - frequency
     f["tx_count"] = g.size()
@@ -127,6 +142,8 @@ def score(tx: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     g = tx.groupby("user_id")
     tx["user_median_amount"] = g.amount.transform("median")
     tx["user_median_distance"] = g.distance_km.transform("median")
+    # how many times this exact amount appears in the user's history
+    tx["amt_occurrences"] = tx.groupby(["user_id", "amount"]).amount.transform("size")
 
     # --- per-transaction component scores (0-100) ----------------------
     # L_i: remote payments are inherently more notable; within-remote,
@@ -136,11 +153,14 @@ def score(tx: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         60 + 40 * clip01((tx.distance_km - REMOTE_KM) / 1500),
         20 * clip01(tx.distance_km / REMOTE_KM),
     )
-    # A_i: large round amount that deviates from the user's own typical amount
+    # A_i: round large amount, repeated in the user's own history, deviating
+    # from their typical amount. The repeat count is what catches local
+    # deposit patterns that have no other signal.
     amt_dev = tx.amount / tx.user_median_amount
     tx["A_i"] = (
-        50 * tx.is_round_large
-        + 50 * clip01(np.log10(amt_dev.clip(lower=0.01)))
+        35 * tx.is_round_large
+        + 35 * clip01((tx.amt_occurrences - 1) / 4)
+        + 30 * clip01(np.log10(amt_dev.clip(lower=0.01)))
     ).clip(0, 100)
     # B_i: transaction deviates from the user's own distance & amount profile
     dist_dev = tx.distance_km / tx.user_median_distance.clip(lower=1.0)
@@ -157,15 +177,23 @@ def score(tx: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     comp = pd.DataFrame(index=f.index)
     comp["L"] = scale_component(f.remote_ratio, 0.0, 0.8)
-    comp["A"] = (scale_component(f.round_large_ratio, 0.05, 0.7) * 0.6
-                  + (100 * clip01(1 - f.amount_cv.fillna(1) / 1.5)) * 0.4).clip(0, 100)
+    # A: amount anomaly. repeat_amount_ratio is the core deposit signal -
+    # share of transactions whose exact amount repeats. High repeat (>=0.4)
+    # with round amounts is nearly exclusive to deposit patterns; a mild
+    # repeat alone (e.g. normal_hard paying a monthly bill) must NOT flag.
+    comp["A"] = (
+        scale_component(f.repeat_amount_ratio, 0.0, 0.6) * 0.45
+        + scale_component(f.round_large_ratio, 0.05, 0.7) * 0.35
+        + (100 * clip01(1 - f.amount_cv.fillna(1) / 1.5)) * 0.20
+    ).clip(0, 100)
     comp["F"] = scale_component(np.log10(f.tx_count.clip(lower=1)), 0.3, 1.8)
     comp["R"] = (scale_component(f.merchant_conc, 0.1, 0.7) * 0.5
                  + scale_component(f.tx_per_merchant.clip(lower=1), 2, 40) * 0.5).clip(0, 100)
     comp["C"] = scale_component(f.freq_change, 0.5, 2.0)
 
     pattern_score = (W_PATTERN["F"] * comp.F + W_PATTERN["R"] * comp.R
-                     + W_PATTERN["L"] * comp.L + W_PATTERN["C"] * comp.C)
+                     + W_PATTERN["L"] * comp.L + W_PATTERN["C"] * comp.C
+                     + W_PATTERN["A"] * comp.A)
 
     # --- UserRisk: recency-weighted average of T_i ------------------------
     tx["ts_rank"] = tx.groupby("user_id").timestamp.rank(pct=True)
@@ -173,8 +201,15 @@ def score(tx: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     wr = tx.assign(wT=tx.d_i * tx.T_i).groupby("user_id")
     user_risk = wr.wT.sum() / wr.d_i.sum()
 
-    final = (W_FINAL_USER * user_risk + W_FINAL_PATTERN * pattern_score).rename(
-        "final_user_risk")
+    # Final = weighted blend, but a strong pattern must be able to carry a user
+    # into review on its own: a local deposit pattern (repeated round amounts)
+    # produces low per-transaction scores while the pattern is unmistakable.
+    # Conditional floor at PATTERN_FLOOR (pattern >= 48 -> final >= pattern):
+    # silent-risky patterns sit at p50 ~51 while normal-hard p75 ~45, so the
+    # floor is selective by construction. Calibrated on smoke data 2026-10-08.
+    blend = W_FINAL_USER * user_risk + W_FINAL_PATTERN * pattern_score
+    floor = pattern_score.where(pattern_score >= PATTERN_FLOOR, 0.0)
+    final = pd.concat([blend, floor], axis=1).max(axis=1).rename("final_user_risk")
 
     out_users = pd.concat(
         [final.rename("final_user_risk"),
