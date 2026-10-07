@@ -1,0 +1,32 @@
+# Laporan Isolation Forest (Tahap 2)
+
+Unsupervised anomaly score vs rule score vs ground truth generator.
+
+## Anomaly score per tipe user
+
+| tipe | n | mean | p50 | p95 | flag(-1) |
+|---|---|---|---|---|---|
+| heavy | 13920 | -0.145 | -0.148 | -0.091 | 0 |
+| mixed | 2022 | -0.142 | -0.137 | -0.033 | 37 |
+| normal | 169956 | -0.288 | -0.296 | -0.223 | 0 |
+| remote | 10109 | -0.113 | -0.111 | -0.024 | 89 |
+| risky | 3993 | 0.047 | 0.05 | 0.081 | 3874 |
+
+## Precision@K: Isolation Forest vs Rule-based
+
+| K | iforest | rule |
+|---|---|---|
+| 100 | 1.000 | 1.000 |
+| 500 | 1.000 | 1.000 |
+| 1000 | 1.000 | 1.000 |
+| 2000 | 1.000 | 1.000 |
+| 4000 | 0.978 | 0.930 |
+
+## PR-AUC (ground truth = risky)
+
+Isolation Forest: 0.9948
+Rule-based:       0.9448
+
+## Agreement top-4000
+
+overlap: 3686 / 4000
