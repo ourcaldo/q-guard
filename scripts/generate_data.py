@@ -186,7 +186,7 @@ def generate(n_users, n_tx, seed, out_dir):
         raise SystemExit("--n-tx must be >= --n-users")
 
     loc = pd.read_csv(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "data", "locations_id.csv"))
+                                   "..", "data", "locations_id.csv"))
     # keep cities with population > 0; big cities drive the distribution
     loc = loc[loc.population > 0].copy().reset_index(drop=True)
     rng = random.Random(seed)
@@ -357,7 +357,8 @@ def main():
     ap.add_argument("--n-users", type=int, default=10_000)
     ap.add_argument("--n-tx", type=int, default=100_000)
     ap.add_argument("--seed", type=int, default=SEED_DEFAULT)
-    ap.add_argument("--out-dir", default="data")
+    ap.add_argument("--out-dir", default=os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "output"))
     a = ap.parse_args()
     generate(a.n_users, a.n_tx, a.seed, a.out_dir)
 
