@@ -77,7 +77,10 @@ Tipe user (distribusi user, bukan transaksi):
 ~7%   heavy_user    power user QRIS normal, frequent tapi pola sehat
 ~5%   remote_user   sering bayar lintas kota (kerja/keluarga, uji false positive)
 ~2%   risky_user    nominal berulang sama, jarak jauh, lonjakan frekuensi,
-                    merchant topup/game, remote_payment_ratio tinggi
+                    pool merchant sangat sempit berulang, remote_payment_ratio
+                    tinggi. Kategori merchant TIDAK menjadi penanda - risky
+                    user membayar merchant dengan sebaran kategori yang sama
+                    seperti user normal.
 ~1%   mixed         normal + sesekali pola risky (edge case)
 ```
 
