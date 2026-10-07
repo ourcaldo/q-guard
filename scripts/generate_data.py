@@ -136,7 +136,7 @@ class MerchantRegistry:
         self.rng = rng
         self.rows = []
 
-    def create(self, risky=False):
+    def create(self):
         w = CATEGORY_W
         cats = list(w)
         weights = [w[c] for c in cats]
@@ -161,23 +161,22 @@ class MerchantRegistry:
             "postal_code": postal,
             "country": "ID",
             "acquirer": self.rng.choice(ACQUIRERS),
-            "is_risky_merchant": risky,
         })
         return self.rows[-1]
 
-    def sample(self, n, risky=False):
+    def sample(self, n):
         """Sample n merchants, creating fresh ones when the registry runs low.
-        Popular (low index) merchants are resampled with boosted probability."""
-        pool_risky = [r for r in self.rows if r["is_risky_merchant"] == risky]
-        while len(pool_risky) < n:
-            pool_risky.append(self.create(risky=risky))
-        # popularity weighting: earlier-created merchants are more popular
-        idx = list(range(len(pool_risky)))
+        Popular (low index) merchants are resampled with boosted probability.
+        All users draw from the same registry - there is no risky-merchant
+        subset because merchant category says nothing about transaction risk."""
+        while len(self.rows) < n:
+            self.create()
+        idx = list(range(len(self.rows)))
         w = [1.0 / (1 + 0.05 * i) for i in idx]
         picks = set()
         while len(picks) < n:
             picks.add(self.rng.choices(idx, weights=w)[0])
-        return [pool_risky[i] for i in sorted(picks)]
+        return [self.rows[i] for i in sorted(picks)]
 
 
 # ---------------------------------------------------------------- generation
@@ -242,14 +241,15 @@ def generate(n_users, n_tx, seed, out_dir):
         if u["user_type"] == "remote":
             ureg.append(registries[u["remote_city_idx"]])
         pool_size = POOL_SIZE[u["user_type"]]
-        # risky users: small pool of risky merchants in one big remote city
+        # Risky/mixed users pay a small merchant pool in one big remote city,
+        # drawn from the SAME per-city registry everyone else uses.
         risky_pool = None
-        if u["user_type"] in ("risky",):
+        if u["user_type"] == "risky":
             rc = rng.choice(risky_cities)
-            risky_pool = registries[rc].sample(POOL_SIZE["risky"], risky=True)
+            risky_pool = registries[rc].sample(POOL_SIZE["risky"])
         elif u["user_type"] == "mixed":
             rc = rng.choice(risky_cities)
-            risky_pool = registries[rc].sample(2, risky=True)
+            risky_pool = registries[rc].sample(2)
 
         local_pool = ureg[0].sample(pool_size)
         if len(ureg) > 1:
