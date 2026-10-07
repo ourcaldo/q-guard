@@ -87,7 +87,19 @@ AMOUNT_BY_CATEGORY = {  # (low, typical_high) rupiah, log-uniform within range
     "family_transfer": (20000, 500000), "game_topup": (10000, 100000),
     "other": (5000, 200000),
 }
-RISKY_AMOUNT_SET = [25000, 50000, 100000, 200000]  # repeated exact amounts
+
+# Round-amount behaviour (grounded in domain knowledge, not a fixed "risky set"):
+# gambling deposits overwhelmingly use round multiples of 50k (50k, 100k, 150k,
+# 200k, ...) and rarely odd values - but NOT exclusively:
+#  - normal users also pay round amounts (family transfers, utility bills)
+#  - gambling users occasionally deposit odd amounts
+# The A signal must therefore be statistical (share of repeated large round
+# amounts), never "round amount = gambling".
+ROUND_TRANSFER_CATEGORIES = {"family_transfer", "utilities", "digital_service"}
+ROUND_TRANSFER_SHARE = 0.40          # share of those categories paid in round 50k multiples
+RISKY_ROUND_SHARE = 0.85             # share of gambling deposits that are round
+RISKY_DEPOSIT_GRID = [50_000, 100_000, 150_000, 200_000, 250_000,
+                      300_000, 400_000, 500_000, 750_000, 1_000_000]
 
 JITTER_KM = 3.0  # coordinate jitter around city center
 MAX_AMOUNT = 10_000_000  # BI limit per QRIS transaction
@@ -119,8 +131,15 @@ def jitter_coord(rng, lat, lon, km=JITTER_KM):
 
 
 def amount_for(rng, category, risky=False):
-    if risky:
-        return float(rng.choice(RISKY_AMOUNT_SET))
+    """Amounts: log-uniform per category, snapped to 100s (real merchant prices).
+    Both sides get round amounts - normal users via transfer-like categories
+    and utility bills, gambling users via the deposit grid. The overlap is the
+    point: roundness alone never decides anything."""
+    round_cat = category in ROUND_TRANSFER_CATEGORIES
+    if risky and rng.random() < RISKY_ROUND_SHARE:
+        return float(rng.choice(RISKY_DEPOSIT_GRID))
+    if (not risky) and round_cat and rng.random() < ROUND_TRANSFER_SHARE:
+        return float(rng.choice(RISKY_DEPOSIT_GRID))
     lo, hi = AMOUNT_BY_CATEGORY.get(category, AMOUNT_BY_CATEGORY["other"])
     return float(round(10 ** rng.uniform(math.log10(lo), math.log10(hi)), -2))
 
