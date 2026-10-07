@@ -48,7 +48,8 @@ python generate_data.py --n-users 200000 --n-tx 2000000 --seed 42 # full simulat
 - Repository: q-guard on GitHub under the account tied to **ourcaldo@gmail.com**.
 - **All commits and PRs must use only the user's own identity** — never include any AI or Claude attribution (no `Co-Authored-By: Claude`, no "Generated with Claude Code" lines).
 - **VM.md must never be committed or pushed** (contains VPS credentials).
-- Project is not yet a git repository; `git init` + GitHub remote setup is pending.
+- **Edit only on this local machine.** The workflow is: edit locally → commit → push to GitHub → pull on the VM. Never edit code directly on the VM.
+- **Never run heavy commands on this local machine** (training, full data generation, or anything memory-intensive). This local machine has only 4 GB RAM — all heavy work (generation of large datasets, model training, large experiments) runs on the VM (see VM.md). Local is only for editing, small smoke checks, and git operations.
 
 ## Language
 
