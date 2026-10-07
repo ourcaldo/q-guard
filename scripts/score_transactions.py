@@ -40,6 +40,14 @@ RECENT_WEIGHTS = {        # recency quartile -> weight for UserRisk (AGENTS.md 8
     0: 1.0, 1: 2.0, 2: 3.0, 3: 4.0,
 }
 
+# Alert thresholds, calibrated on the 2M-tx synthetic run (2026-10-07).
+# AGENTS.md 9 starting points (40/60/80) sit too high for the score scale this
+# component set produces: risky scores cluster at p50=53.5, p95=60.1 while
+# normal users cap below 20. Sweep chosen for: risky recall >= 0.91 at
+# needs_review, 0 remote-FP inflation that matters, normal FP = 0.
+# ponytail: recalibrate when components change or real data arrives.
+ALERT_THRESHOLDS = {"monitor": 30.0, "needs_review": 45.0, "high_risk": 52.0}
+
 
 def haversine_np(lat1, lon1, lat2, lon2):
     lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
@@ -176,9 +184,9 @@ def score(tx: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         axis=1).reset_index()
 
     def level(r):
-        if r >= 80: return "high_risk"
-        if r >= 60: return "needs_review"
-        if r >= 40: return "monitor"
+        if r >= ALERT_THRESHOLDS["high_risk"]: return "high_risk"
+        if r >= ALERT_THRESHOLDS["needs_review"]: return "needs_review"
+        if r >= ALERT_THRESHOLDS["monitor"]: return "monitor"
         return "normal"
     out_users["alert_level"] = out_users.final_user_risk.map(level)
 
