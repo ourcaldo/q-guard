@@ -17,10 +17,10 @@ Skor rule-based vs ground truth generator (evaluasi saja).
 | tipe | normal | monitor | needs_review | high_risk | total |
 |---|---|---|---|---|---|
 | heavy | 13920 | 0 | 0 | 0 | 13920 |
-| mixed | 1928 | 94 | 0 | 0 | 2022 |
+| mixed | 1267 | 732 | 21 | 2 | 2022 |
 | normal | 169956 | 0 | 0 | 0 | 169956 |
-| remote | 9575 | 534 | 0 | 0 | 10109 |
-| risky | 335 | 3439 | 219 | 0 | 3993 |
+| remote | 3871 | 6169 | 67 | 2 | 10109 |
+| risky | 204 | 140 | 962 | 2687 | 3993 |
 
 ## Precision@2000 (top-2000 skor tertinggi)
 
@@ -28,4 +28,4 @@ proporsi risky+mixed: 1.000
 
 ## False positive check
 
-remote_user di high_risk: 0 / 10109 (harusnya mendekati 0 - jarak jauh sendirian bukti tidak cukup, AGENTS.md 3/16)
+remote_user di high_risk: 2 / 10109 (harusnya mendekati 0 - jarak jauh sendirian bukti tidak cukup, AGENTS.md 3/16)
