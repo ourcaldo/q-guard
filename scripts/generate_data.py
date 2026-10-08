@@ -42,7 +42,7 @@ SEED_DEFAULT = 42
 # (see docs/ASSUMPTIONS.md): without them the synthetic data is too easy and
 # every detector scores near-perfect, which proves nothing.
 USER_TYPE_SHARES = [
-    ("normal", 0.79),
+    ("normal", 0.76),
     ("heavy", 0.07),
     ("remote", 0.05),
     ("risky", 0.02),
@@ -51,18 +51,27 @@ USER_TYPE_SHARES = [
     ("risky_noisy", 0.03),   # gambling pattern but messy: odd amounts, wider pool
     ("normal_hard", 0.02),   # innocent but looks risky: round recurring payments, some remote
     ("risky_silent", 0.01),  # only ONE dimention is off (e.g. repeated amounts only)
+    # adversarial types - hardening round 4 (attack the round-3 assumptions)
+    ("risky_routine", 0.01),     # gambling deposits on a SCHEDULE (recreational
+                                 # bettor with a weekly ritual) - breaks the
+                                 # "deposits are scattered" assumption
+    ("normal_hard_random", 0.02),# innocent recurring round payments at RANDOM
+                                 # times (buy when needed, not on payday) -
+                                 # breaks the "recurring = scheduled" assumption
 ]
 
 # Mean transactions per user over the 6-month window, by type.
 TX_PER_USER = {"normal": 10, "heavy": 60, "remote": 14, "risky": 45, "mixed": 12,
-               "risky_noisy": 45, "normal_hard": 20, "risky_silent": 40}
+               "risky_noisy": 45, "normal_hard": 20, "risky_silent": 40,
+               "risky_routine": 30, "normal_hard_random": 20}
 
 # Share of a user's transactions that are "risky-pattern" for mixed users.
 MIXED_RISKY_SHARE = 0.3
 
 # Merchant pool size per user type.
 POOL_SIZE = {"normal": 10, "heavy": 30, "remote": 14, "risky": 3, "mixed": 10,
-             "risky_noisy": 8, "normal_hard": 10, "risky_silent": 4}
+             "risky_noisy": 8, "normal_hard": 10, "risky_silent": 4,
+             "risky_routine": 3, "normal_hard_random": 10}
 
 # Adversarial behaviour knobs.
 RISKY_NOISY_ROUND_SHARE = 0.45   # only some deposits are round amounts
@@ -152,7 +161,7 @@ def amount_for(rng, category, risky=False, user_type="normal"):
                  "risky_silent": RISKY_ROUND_SHARE}.get(user_type, RISKY_ROUND_SHARE)
         if rng.random() < share:
             return float(rng.choice(RISKY_DEPOSIT_GRID))
-    elif user_type == "normal_hard":
+    elif user_type in ("normal_hard", "normal_hard_random"):
         if rng.random() < NORMAL_HARD_ROUND_SHARE:
             return float(rng.choice(RISKY_DEPOSIT_GRID))
     elif round_cat and rng.random() < ROUND_PAYMENT_SHARE:
@@ -294,6 +303,15 @@ def generate(n_users, n_tx, seed, out_dir):
             # like the remote type but fewer transactions there.
             rc = rng.choice(risky_cities)
             risky_pool = registries[rc].sample(6)
+        elif u["user_type"] == "risky_routine":
+            # scheduled gambler: same remote-city deposit pool as risky,
+            # but on a weekly ritual
+            rc = rng.choice(risky_cities)
+            risky_pool = registries[rc].sample(POOL_SIZE["risky_routine"])
+        elif u["user_type"] == "normal_hard_random":
+            # innocent recurring round payments to a LOCAL merchant at random
+            # times - attacks the "recurring = scheduled" assumption
+            risky_pool = ureg[0].sample(6)
         elif u["user_type"] == "mixed":
             rc = rng.choice(risky_cities)
             risky_pool = registries[rc].sample(2)
@@ -329,16 +347,29 @@ def generate(n_users, n_tx, seed, out_dir):
             starts = np.arange(n) * gap
             days = starts + nprng.normal(0, 2, size=n)  # ~2-day jitter
             days = np.clip(days, 0, WINDOW_DAYS - 1)
+        elif u["user_type"] == "risky_routine":
+            # Gambling deposits on a weekly ritual (recreational bettor:
+            # AUSTRAC 17.3a lists frequency changes as an indicator; regular
+            # weekend betting is a documented recreational pattern). Breaks
+            # the round-3 "scattered timing" assumption from the OTHER side.
+            weeks = WINDOW_DAYS // 7
+            week_slots = nprng.integers(0, weeks, size=n)
+            day_in_week = rng.randrange(7)  # one stable weekday per user
+            days = week_slots * 7 + day_in_week + nprng.normal(0, 0.5, size=n)
+            days = np.clip(days, 0, WINDOW_DAYS - 1)
+        # normal_hard_random keeps the uniform random spread above: innocent
+        # recurring round payments at random times (buys when needed).
         ts = pd.Timestamp("2026-04-01").value + days * 86400 * 10**9
         ts += nprng.integers(0, 86400, size=n) * 10**9  # random time of day (not a signal)
         ts = pd.to_datetime(np.sort(ts))
 
         for k in range(n):
-            if u["user_type"] in ("risky", "risky_noisy", "risky_silent"):
+            if u["user_type"] in ("risky", "risky_noisy", "risky_silent",
+                                  "risky_routine"):
                 is_risky_tx = True
             elif u["user_type"] == "mixed":
                 is_risky_tx = rng.random() < MIXED_RISKY_SHARE
-            elif u["user_type"] == "normal_hard":
+            elif u["user_type"] in ("normal_hard", "normal_hard_random"):
                 is_risky_tx = rng.random() < NORMAL_HARD_REMOTE_SHARE
             else:
                 is_risky_tx = False
