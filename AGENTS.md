@@ -608,6 +608,14 @@ Sinyal harus dinilai bersama dan dibandingkan dengan profil perilaku user.
 
 - PPATK. **“Judi Online Membajak Piala Dunia 2026, Deposit Tembus Rp1 Triliun.”** 5 Agustus 2026.
 - PPATK melaporkan QRIS sebagai kanal penting dalam deposit judi online dan menganalisis rekening, kanal pembayaran, frekuensi, nilai deposit, serta aliran dana.
+- Data kuantitatif S1-2026: deposit QRIS Rp12,36 triliun (56% nilai, 87,66% frekuensi dari seluruh deposit). Frekuensi deposit naik 140% YoY sementara nilai per transaksi turun — pelaku memecah transaksi ke nominal kecil dan frekuensi tinggi.
+- PPATK menyebut pola transaksi judi sebagai “bernominal kecil, berulang, dan tersebar” — dasar resmi untuk sinyal repetisi nominal (komponen A) dan frekuensi tinggi yang tidak berjadwal (fitur interval regularity).
+
+### 17.3a AUSTRAC
+
+- AUSTRAC. **“Indicators of suspicious activity for the online betting agencies sector.”** Diperbarui 25 Maret 2026.
+- Indikator resmi yang relevan: “multiple deposits within a short period”, “increase in the number and/or value of deposits”, “change in betting activity including the frequency”, dan “uses their employer’s or own business’s point of sale devices to deposit funds into their gambling account” (deposit via merchant/POS lokal — validasi pola risky_silent).
+- Dasar regulator untuk fitur tren frekuensi naik dan interval tidak berjadwal sebagai pembeda deposit dari pembayaran rutin.
 
 ### 17.4 Referensi teknis
 

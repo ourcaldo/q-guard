@@ -127,6 +127,24 @@ def per_user_features(tx: pd.DataFrame) -> pd.DataFrame:
     first = tx_sorted[tx_sorted.is_second_half == 0].groupby("user_id").size()
     f["freq_change"] = (second / first.clip(lower=1)).fillna(1.0)
 
+    # Interval regularity (round 3): recurring legitimate payments are
+    # scheduled (near-constant intervals), gambling deposits are frequent and
+    # scattered (PPATK 17.3, AUSTRAC 17.3a). cv of the day-gap between
+    # consecutive transactions to the same merchant: small cv = scheduled.
+    def interval_cv(d):
+        d = d.sort_values("timestamp")
+        if len(d) < 3:
+            return np.nan
+        gaps = d.timestamp.diff().dt.total_seconds().dropna() / 86400.0
+        if gaps.mean() <= 0:
+            return np.nan
+        return float(gaps.std() / gaps.mean())
+    f["same_merchant_interval_cv"] = (
+        tx.groupby(["user_id", "merchant_id"])
+        .apply(interval_cv, include_groups=False)
+        .reset_index().groupby("user_id")[0].median()
+    )
+
     return f
 
 
@@ -180,12 +198,17 @@ def score(tx: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     # A: amount anomaly. repeat_amount_ratio is the core deposit signal -
     # share of transactions whose exact amount repeats. High repeat (>=0.4)
     # with round amounts is nearly exclusive to deposit patterns; a mild
-    # repeat alone (e.g. normal_hard paying a monthly bill) must NOT flag.
-    comp["A"] = (
+    # repeat alone must NOT flag. Round 3: scattered timing (high interval
+    # cv, PPATK "tersebar") amplifies the deposit reading, while a SCHEDULED
+    # pattern (low cv - same merchant, near-constant gaps) discounts it:
+    # that is what recurring family/business payments look like.
+    scatter = scale_component(f.same_merchant_interval_cv.fillna(0.5), 0.15, 0.9)
+    base_a = (
         scale_component(f.repeat_amount_ratio, 0.0, 0.6) * 0.45
         + scale_component(f.round_large_ratio, 0.05, 0.7) * 0.35
         + (100 * clip01(1 - f.amount_cv.fillna(1) / 1.5)) * 0.20
-    ).clip(0, 100)
+    )
+    comp["A"] = (base_a * (0.55 + 0.45 * scatter / 100)).clip(0, 100)
     comp["F"] = scale_component(np.log10(f.tx_count.clip(lower=1)), 0.3, 1.8)
     comp["R"] = (scale_component(f.merchant_conc, 0.1, 0.7) * 0.5
                  + scale_component(f.tx_per_merchant.clip(lower=1), 2, 40) * 0.5).clip(0, 100)

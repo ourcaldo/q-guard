@@ -55,14 +55,14 @@ USER_TYPE_SHARES = [
 
 # Mean transactions per user over the 6-month window, by type.
 TX_PER_USER = {"normal": 10, "heavy": 60, "remote": 14, "risky": 45, "mixed": 12,
-               "risky_noisy": 45, "normal_hard": 20, "risky_silent": 25}
+               "risky_noisy": 45, "normal_hard": 20, "risky_silent": 40}
 
 # Share of a user's transactions that are "risky-pattern" for mixed users.
 MIXED_RISKY_SHARE = 0.3
 
 # Merchant pool size per user type.
 POOL_SIZE = {"normal": 10, "heavy": 30, "remote": 14, "risky": 3, "mixed": 10,
-             "risky_noisy": 8, "normal_hard": 10, "risky_silent": 10}
+             "risky_noisy": 8, "normal_hard": 10, "risky_silent": 4}
 
 # Adversarial behaviour knobs.
 RISKY_NOISY_ROUND_SHARE = 0.45   # only some deposits are round amounts
@@ -284,8 +284,9 @@ def generate(n_users, n_tx, seed, out_dir):
             rc = rng.choice(risky_cities)
             risky_pool = registries[rc].sample(POOL_SIZE[u["user_type"]])
         elif u["user_type"] == "risky_silent":
-            # silent risky: LOCAL merchants (normal pool, no distance signal)
-            # with repeated round deposits - only the A/R signal is present
+            # silent risky: LOCAL merchants, small pool (4) with repeated round
+            # deposits - frequent & scattered (PPATK "kecil, berulang,
+            # tersebar"), only the A/R signals present, no distance signal
             risky_pool = ureg[0].sample(POOL_SIZE["risky_silent"])
         elif u["user_type"] == "normal_hard":
             # hard normal: innocent user with a family/errand pattern in ONE
@@ -318,6 +319,16 @@ def generate(n_users, n_tx, seed, out_dir):
             else:  # burst: a random ~3-week intense episode
                 start = rng.randrange(0, WINDOW_DAYS - 21)
                 days = nprng.integers(start, start + 21, size=n)
+        elif u["user_type"] == "normal_hard":
+            # Recurring family/business payments are SCHEDULED: roughly one
+            # payment per month at a stable day, plus small jitter. This is
+            # the honest opposite of the deposit pattern (PPATK 17.3
+            # "kecil, berulang, tersebar" = frequent & scattered) and gives
+            # interval-regularity features something real to separate on.
+            gap = max(WINDOW_DAYS // max(n, 1), 1)
+            starts = np.arange(n) * gap
+            days = starts + nprng.normal(0, 2, size=n)  # ~2-day jitter
+            days = np.clip(days, 0, WINDOW_DAYS - 1)
         ts = pd.Timestamp("2026-04-01").value + days * 86400 * 10**9
         ts += nprng.integers(0, 86400, size=n) * 10**9  # random time of day (not a signal)
         ts = pd.to_datetime(np.sort(ts))

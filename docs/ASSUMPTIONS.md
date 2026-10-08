@@ -34,6 +34,17 @@ Tipe adversarial (hardening round 1, agar evaluasi tidak terlalu mudah):
 | `ROUND_TRANSFER_SHARE` | 0.40 | normal user juga bayar bulat (tagihan/jasa); proporsi karangan |
 | `RISKY_DEPOSIT_GRID` | 50k s/d 1jt kelipatan 50k | grid kelipatan 50k berdasar domain knowledge; batas atas karangan |
 | Timing shapes risky | steady/spike/burst 1:1:1 | tiga bentuk masuk akal (escalation/binge/chronic) tapi proporsi karangan |
+
+Naik status (2026-10-08, riset regulator):
+
+- **Frekuensi deposit tinggi & tidak berjadwal, tren naik** — dasar resmi:
+  PPATK "bernominal kecil, berulang, dan tersebar" + frekuensi +140% YoY
+  (AGENTS.md 17.3); AUSTRAC "multiple deposits within a short period",
+  "increase in number and/or value of deposits" (17.3a). Bukan karangan lagi.
+- **Deposit via merchant/POS lokal** (pola risky_silent) — AUSTRAC 17.3a
+  secara eksplisit menyebut pola deposit via point-of-sale milik sendiri.
+- **Pembayaran rutin keluarga/cicilan = berjadwal reguler** — tetap asumsi
+  domain logic (velocity monitoring standar), tidak ada sumber judol-specific.
 | `risky_cities` | 6 kota populasi terbesar | asumsi merchant deposit nongkrong di kota besar |
 | Failed rate | 4% | tidak ada data publik failure rate QRIS |
 | `JITTER_KM` | 3 km | presisi lokasi user/merchant sintetis |
