@@ -42,7 +42,7 @@ SEED_DEFAULT = 42
 # (see docs/ASSUMPTIONS.md): without them the synthetic data is too easy and
 # every detector scores near-perfect, which proves nothing.
 USER_TYPE_SHARES = [
-    ("normal", 0.76),
+    ("normal", 0.74),
     ("heavy", 0.07),
     ("remote", 0.05),
     ("risky", 0.02),
@@ -58,12 +58,23 @@ USER_TYPE_SHARES = [
     ("normal_hard_random", 0.02),# innocent recurring round payments at RANDOM
                                  # times (buy when needed, not on payday) -
                                  # breaks the "recurring = scheduled" assumption
+    # adversarial types - round 5 (attack the graph/M assumptions)
+    ("risky_silent_shared", 0.01),  # silent depositors who share the SAME
+                                    # local fronting merchant with many other
+                                    # depositors - the realistic fronting-shop
+                                    # pattern (PPATK: merchant misuse; AUSTRAC
+                                    # 17.3a: deposits via local POS)
+    ("normal_collective", 0.01),    # innocents paying recurring round dues to
+                                    # ONE shared local merchant together
+                                    # (iuran/arusan/koperasi) - attacks the
+                                    # "lit merchant = fronting" assumption
 ]
 
 # Mean transactions per user over the 6-month window, by type.
 TX_PER_USER = {"normal": 10, "heavy": 60, "remote": 14, "risky": 45, "mixed": 12,
                "risky_noisy": 45, "normal_hard": 20, "risky_silent": 40,
-               "risky_routine": 30, "normal_hard_random": 20}
+               "risky_routine": 30, "normal_hard_random": 20,
+               "risky_silent_shared": 40, "normal_collective": 15}
 
 # Share of a user's transactions that are "risky-pattern" for mixed users.
 MIXED_RISKY_SHARE = 0.3
@@ -71,7 +82,14 @@ MIXED_RISKY_SHARE = 0.3
 # Merchant pool size per user type.
 POOL_SIZE = {"normal": 10, "heavy": 30, "remote": 14, "risky": 3, "mixed": 10,
              "risky_noisy": 8, "normal_hard": 10, "risky_silent": 4,
-             "risky_routine": 3, "normal_hard_random": 10}
+             "risky_routine": 3, "normal_hard_random": 10,
+             "risky_silent_shared": 3, "normal_collective": 3}
+
+# Round 5: shared fronting merchants. Created lazily per city; depositors and
+# collective-due payers each cluster onto a few shared merchants in their own
+# home city, mimicking one shop fronting many payers (or one shop collecting
+# dues for many innocent neighbours).
+SHARED_FRONTING_PER_CITY = 3
 
 # Adversarial behaviour knobs.
 RISKY_NOISY_ROUND_SHARE = 0.45   # only some deposits are round amounts
@@ -281,6 +299,7 @@ def generate(n_users, n_tx, seed, out_dir):
     risky_cities = loc[loc.population > 1_000_000].nlargest(risky_city_count, "population").index.tolist()
 
     tx_rows = []
+    shared_pools = {}
     for i, u in enumerate(users):
         ureg = [registries[u["home_city_idx"]]]
         if u["user_type"] == "remote":
@@ -312,6 +331,17 @@ def generate(n_users, n_tx, seed, out_dir):
             # innocent recurring round payments to a LOCAL merchant at random
             # times - attacks the "recurring = scheduled" assumption
             risky_pool = ureg[0].sample(6)
+        elif u["user_type"] in ("risky_silent_shared", "normal_collective"):
+            # Round 5: payers cluster onto a few SHARED merchants in their own
+            # city - depositors onto fronting shops, or innocents paying
+            # collective dues to one collector merchant. The shared pool is
+            # per-city so cross-user signal (graph M) has something to test.
+            key = ("shared", u["home_city_idx"])
+            if key not in shared_pools:
+                reg = ureg[0]
+                n_shared = min(SHARED_FRONTING_PER_CITY, len(reg.rows) or 1)
+                shared_pools[key] = reg.sample(max(n_shared, 1))
+            risky_pool = shared_pools[key]
         elif u["user_type"] == "mixed":
             rc = rng.choice(risky_cities)
             risky_pool = registries[rc].sample(2)
@@ -365,7 +395,7 @@ def generate(n_users, n_tx, seed, out_dir):
 
         for k in range(n):
             if u["user_type"] in ("risky", "risky_noisy", "risky_silent",
-                                  "risky_routine"):
+                                  "risky_routine", "risky_silent_shared"):
                 is_risky_tx = True
             elif u["user_type"] == "mixed":
                 is_risky_tx = rng.random() < MIXED_RISKY_SHARE
