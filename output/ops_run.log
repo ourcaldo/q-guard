@@ -1,0 +1,28 @@
+[2026-04-30] window rows 311,682, newly caught 2,576
+[2026-05-31] window rows 322,649, newly caught 2,814
+[2026-06-30] window rows 323,264, newly caught 2,787
+[2026-07-31] window rows 334,146, newly caught 3,879
+[2026-08-31] window rows 334,592, newly caught 3,929
+[2026-09-30] window rows 330,307, newly caught 3,727
+# Laporan Simulasi Operasional - Point 4
+
+## Beban antrean (scoring window penuh 6 bulan)
+
+- high_risk: 12,975 user (6.5%) -> ~2,162/bulan, ~4,325 jam review total
+- needs_review: 1,989 user (1.0%) -> ~332/bulan, ~663 jam review total
+- monitor: 3,555 user (1.8%) -> ~592/bulan, ~1,185 jam review total
+- normal: 181,481 user (90.7%) -> ~30,247/bulan, ~60,494 jam review total
+
+Total masuk antrean review: 14,964 user (7.5% dari 200,000)
+Kapasitas reviewer: 4,988 jam / 6 bulan = 5.2 FTE (asumsi 160 jam/bulan/reviewer, 20 menit/user)
+
+## Latensi deteksi (rolling 30 hari)
+
+Deposit user yang tertangkap dalam rolling window: 10,013 / 16,078 (62.3%)
+Hari dari transaksi deposit pertama sampai masuk review:
+- median: 33 hari
+- p25: 25 hari, p75: 86 hari
+
+Catatan: user yang belum tertangkap di bulan mana pun sebagian
+besar adalah pola tipis (lihat laporan time-split) - mereka
+butuh akumulasi transaksi lebih banyak sebelum sinyal repetisi matang.
