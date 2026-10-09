@@ -1,0 +1,3 @@
+[done] users: 200000  merchants: 14842  tx: 2000241
+[done] tx/user: mean=10.0 min=3 max=54
+[done] user types: {'normal': np.int64(148040), 'heavy': np.int64(14086), 'remote': np.int64(9772), 'risky_noisy': np.int64(5941), 'risky': np.int64(4074), 'normal_hard': np.int64(4021), 'normal_hard_random': np.int64(4018), 'risky_silent': np.int64(2054), 'risky_silent_shared': np.int64(2025), 'normal_collective': np.int64(2022), 'risky_routine': np.int64(1984), 'mixed': np.int64(1963)}
