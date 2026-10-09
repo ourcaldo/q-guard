@@ -1,0 +1,24 @@
+[split] fit: 979161 rows, test: 1021080 rows
+[split] train: 193209 users (14070 risky), test: 194706 users (15493 risky)
+[random_forest] PR-AUC 0.9972  P@2000 1.000
+[grad_boost] PR-AUC 0.9975  P@2000 0.999
+# Laporan Supervised (Rehearsal) - Point 3
+
+Latihan mekanik pipeline supervised. Label = generator
+(placeholder), BUKAN kebenaran - lihat catatan di file ini.
+
+## random_forest
+
+PR-AUC (test window): 0.9972
+Precision@K (test): 100=1.000, 500=1.000, 1000=1.000, 2000=1.000
+Recall@n(risky): 0.980
+
+## grad_boost
+
+PR-AUC (test window): 0.9975
+Precision@K (test): 100=1.000, 500=0.998, 1000=0.999, 2000=0.999
+Recall@n(risky): 0.982
+
+## Baseline (rule) di test window yang sama
+
+PR-AUC: 0.9290
