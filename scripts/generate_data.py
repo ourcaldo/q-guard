@@ -198,6 +198,15 @@ class MerchantRegistry:
         self.city = city          # dict row from locations_id.csv
         self.rng = rng
         self.rows = []
+        self.fronting_rows = []   # dedicated shared/fronting merchants
+
+    def create_fronting(self):
+        """A merchant outside the popularity pool - dedicated fronting shops
+        used only by round-5 shared payers, so their payer mix is not
+        diluted by ordinary users."""
+        m = self.create()
+        self.fronting_rows.append(m)
+        return m
 
     def create(self):
         w = CATEGORY_W
@@ -333,14 +342,18 @@ def generate(n_users, n_tx, seed, out_dir):
             risky_pool = ureg[0].sample(6)
         elif u["user_type"] in ("risky_silent_shared", "normal_collective"):
             # Round 5: payers cluster onto a few SHARED merchants in their own
-            # city - depositors onto fronting shops, or innocents paying
-            # collective dues to one collector merchant. The shared pool is
-            # per-city so cross-user signal (graph M) has something to test.
+            # city. Crucially these are DEDICATED shared merchants, created
+            # outside the normal per-city registry sampling - a real fronting
+            # shop serves many depositors but not the general public, and a
+            # dues-collecting merchant serves its members only. Drawing from
+            # the general registry would dilute the cross-user signal with
+            # ordinary payers.
             key = ("shared", u["home_city_idx"])
             if key not in shared_pools:
-                reg = ureg[0]
-                n_shared = min(SHARED_FRONTING_PER_CITY, len(reg.rows) or 1)
-                shared_pools[key] = reg.sample(max(n_shared, 1))
+                reg = registries[u["home_city_idx"]]
+                while len(reg.fronting_rows) < SHARED_FRONTING_PER_CITY:
+                    reg.create_fronting()
+                shared_pools[key] = reg.fronting_rows[:]
             risky_pool = shared_pools[key]
         elif u["user_type"] == "mixed":
             rc = rng.choice(risky_cities)
